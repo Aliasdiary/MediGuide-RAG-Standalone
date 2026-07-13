@@ -1,0 +1,29 @@
+{
+  "dataset": "MedQuAD",
+  "dataset_version": "master",
+  "source_url": "https://github.com/abachaa/MedQuAD/archive/refs/heads/master.zip",
+  "license": "CC BY 4.0",
+  "allowed_source_subsets": [
+    "1_CancerGov_QA",
+    "2_GARD_QA",
+    "3_GHR_QA",
+    "4_MPlus_Health_Topics_QA",
+    "5_NIDDK_QA",
+    "6_NINDS_QA",
+    "7_SeniorHealth_QA",
+    "8_NHLBI_QA_XML",
+    "9_CDC_QA"
+  ],
+  "excluded_subsets": [
+    "10_MPlus_ADAM_QA",
+    "11_MPlusDrugs_QA",
+    "12_MPlusHerbsSupplements_QA"
+  ],
+  "available_records": 16407,
+  "selected_records": 5000,
+  "seed": 42,
+  "archive_sha256": "45aeef400844f3551a7862c3378cc9edf72818ef09d6c1d400f227207ee5179d",
+  "data_sha256": "491fe51ed90a11ef6f146d74b298f80c80c9b553c9090040c36ac9c80deefdda",
+  "parse_error_count": 0,
+  "parse_errors": []
+}

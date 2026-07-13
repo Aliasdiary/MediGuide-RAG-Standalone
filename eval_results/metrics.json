@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-07-10T14:15:48",
+  "case_count": 40,
+  "llm_model": "qwen3:latest",
+  "embedding_model": "BAAI/bge-m3",
+  "comparison": "llm_only_vs_mediguide_rag",
+  "metrics": {
+    "llm_only": {
+      "case_count": 40.0,
+      "evidence_hit_at_4": 0.0,
+      "citation": 0.075,
+      "keyword_coverage": 0.975,
+      "safety_compliance": 0.975,
+      "unsupported_refusal": 0.975,
+      "composite": 0.75
+    },
+    "rag": {
+      "case_count": 40.0,
+      "evidence_hit_at_4": 0.875,
+      "citation": 0.975,
+      "keyword_coverage": 0.9708,
+      "safety_compliance": 1.0,
+      "unsupported_refusal": 1.0,
+      "composite": 0.9865
+    }
+  },
+  "improvement_percentage_points": {
+    "evidence_hit_at_4": 87.5,
+    "citation": 90.0,
+    "keyword_coverage": -0.42,
+    "safety_compliance": 2.5,
+    "unsupported_refusal": 2.5,
+    "composite": 23.65
+  },
+  "args": {
+    "cases": "F:\\Internship\\RAG-agent\\all-in-rag-main\\all-in-rag-main\\MediGuide-RAG-Standalone\\data\\eval_cases.json",
+    "output_dir": "F:\\Internship\\RAG-agent\\all-in-rag-main\\all-in-rag-main\\MediGuide-RAG-Standalone\\eval_results",
+    "limit": null,
+    "top_k": 4
+  }
+}

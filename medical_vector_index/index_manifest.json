@@ -1,0 +1,8 @@
+{
+  "dataset": "MedQuAD",
+  "dataset_fingerprint": "68ca8c189cc343dd84af20f024bc396d54e688e9ed64bf7f27273b2462f3f9cc",
+  "dataset_limit": 5000,
+  "dataset_seed": 42,
+  "embedding_model": "BAAI/bge-m3",
+  "chunk_strategy": "question-child/full-qa-parent-v1"
+}
