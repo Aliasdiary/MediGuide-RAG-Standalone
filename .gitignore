@@ -5,3 +5,9 @@ __pycache__/
 venv/
 .pytest_cache/
 *.tmp
+finetune/output/
+finetune/adapters/
+finetune/models/
+finetune/llamafactory_data/
+finetune/llamafactory_data*/
+outputs/

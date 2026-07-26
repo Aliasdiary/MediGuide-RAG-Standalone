@@ -12,6 +12,7 @@ from rag_modules.data_preparation import DataPreparationModule
 from rag_modules.generation_integration import GenerationIntegrationModule
 from rag_modules.retrieval_optimization import RetrievalOptimizationModule
 from langchain_core.documents import Document
+from finetune.build_sft_dataset import filter_records, medquad_to_sample, write_dataset_info
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "prepare_medquad.py"
@@ -113,6 +114,51 @@ class MedQuADPipelineTest(unittest.TestCase):
             query="hypertension high blood pressure risk factors",
         )
         self.assertEqual("exact", ranked[0].metadata["chunk_id"])
+
+    def test_sft_sample_preserves_source_and_safety_boundary(self):
+        record = {
+            "question": "What is High Blood Pressure?",
+            "answer": "High blood pressure is a common condition.",
+            "question_type": "information",
+            "focus": "High Blood Pressure",
+            "source_org": "NHLBI",
+            "source_url": "http://example.org/hbp",
+        }
+        sample = medquad_to_sample(record)
+        self.assertIn("MedQuAD source", sample["input"])
+        self.assertIn("NHLBI", sample["output"])
+        self.assertIn("cannot replace professional medical diagnosis", sample["output"])
+
+    def test_sft_filter_removes_long_answers(self):
+        records = [
+            {
+                "question": "Q1",
+                "answer": "short",
+                "question_type": "information",
+                "focus": "Topic",
+                "source_org": "NHLBI",
+                "source_url": "http://example.org/1",
+            },
+            {
+                "question": "Q2",
+                "answer": "x" * 20,
+                "question_type": "information",
+                "focus": "Topic",
+                "source_org": "NHLBI",
+                "source_url": "http://example.org/2",
+            },
+        ]
+        filtered = filter_records(records, max_answer_chars=10)
+        self.assertEqual(1, len(filtered))
+        self.assertEqual("Q1", filtered[0]["question"])
+
+    def test_write_llamafactory_dataset_info(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_dir = Path(temp_dir)
+            write_dataset_info(output_dir)
+            info = json.loads((output_dir / "dataset_info.json").read_text(encoding="utf-8"))
+            self.assertIn("mediguide_sft_train", info)
+            self.assertEqual("output", info["mediguide_sft_train"]["columns"]["response"])
 
 
 if __name__ == "__main__":

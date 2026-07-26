@@ -100,3 +100,41 @@ The current 40-case run compares local `qwen3:latest` without RAG against the
 full MedQuAD + BGE-M3 + FAISS/BM25 + RRF + citation workflow. The metrics are
 engineering evaluation numbers only and do not represent clinical diagnostic
 accuracy.
+
+## SFT / QLoRA Fine-Tuning
+
+The project also includes a non-RAG SFT path for AutoDL RTX 4090 experiments.
+It builds Alpaca-style medical instruction data from MedQuAD and fine-tunes
+`Qwen/Qwen2.5-3B-Instruct` with LLaMA-Factory QLoRA.
+
+```bash
+python finetune/build_sft_dataset.py \
+  --input data/medquad_5000.jsonl \
+  --output-dir finetune/llamafactory_data \
+  --train-size 4500 \
+  --valid-size 300
+```
+
+On AutoDL:
+
+```bash
+cd /root/autodl-tmp
+git clone https://github.com/Aliasdiary/MediGuide-RAG-Standalone.git
+
+modelscope download --model Qwen/Qwen2.5-3B-Instruct \
+  --local_dir /root/autodl-tmp/models/Qwen2.5-3B-Instruct
+
+cd /root/autodl-tmp/MediGuide-RAG-Standalone
+python finetune/build_sft_dataset.py \
+  --input data/medquad_5000.jsonl \
+  --output-dir finetune/llamafactory_data \
+  --train-size 4500 \
+  --valid-size 300
+
+llamafactory-cli train /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/qwen25_3b_qlora_sft.yaml
+```
+
+See `finetune/README.md` for the full AutoDL environment setup and training
+notes, including the recommended `base -> med-sft` cloned environment and a
+separate later `med-vllm` inference environment. Ollama models remain useful
+for local inference baselines, but they are not used as SFT training bases.
