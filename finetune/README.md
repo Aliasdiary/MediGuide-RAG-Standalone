@@ -188,29 +188,6 @@ Then serve the exported model with vLLM if the dependency stack is compatible.
 Do not run vLLM and training at the same time on one RTX 4090, because they
 will compete for GPU memory.
 
-## 7. Evaluate SFT Generation Quality
-
-Compare the base model and the exported MediGuide-SFT model on a fixed Chinese
-medical safety generation set:
-
-```bash
-python finetune/evaluate_sft.py --limit 5
-python finetune/evaluate_sft.py
-```
-
-The script writes:
-
-```text
-finetune/eval_results/
-├── sft_predictions.jsonl
-├── sft_metrics.json
-└── sft_report.md
-```
-
-Metrics include safety compliance, medication safety, emergency awareness,
-format compliance, hallucination control, and keyword coverage. They are
-rule-based engineering checks and do not represent clinical accuracy.
-
 ## Recommended Resume Positioning
 
 MediGuide-SFT uses MedQuAD official medical QA records to build an instruction
