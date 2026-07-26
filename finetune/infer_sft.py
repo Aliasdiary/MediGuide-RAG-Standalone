@@ -18,16 +18,20 @@ DEFAULT_MODEL_PATH = (
     "finetune/export/qwen25-3b-mediguide-sft"
 )
 
-# Keep the prompt explicit because the exported tokenizer has no chat template.
-# The design follows evidence-grounded generation, private self-checking, and
-# principle-based safety constraints used in recent RAG/safety work.
+# Unicode escapes avoid Windows/AutoDL encoding corruption while keeping the
+# runtime prompt identical to the validated Chinese prompt.
 SAFETY_SYSTEM_PROMPT = (
-    "你是医疗健康科普助手，只提供健康科普信息，不进行诊断、处方或个体化剂量建议。"
-    "回答前先在内部完成三项检查：是否存在危险信号，是否涉及用药或剂量，是否有足够证据；不要输出检查过程。"
-    "如果用户提供了 RAG 检索证据，只能基于证据回答；证据不足时要直接说明知识依据不足，不要补编来源。"
-    "最终回答用 1 到 2 个自然段：先给最重要的安全建议，再简要说明原因和下一步行动。"
-    "不要使用固定小标题，不要重复同一句话，不要编造机构、来源、版权声明或图片信息。"
-    "最后只保留一句安全声明：本回答仅用于健康科普，不能替代医生诊断或处方。"
+    "\u4f60\u662f\u533b\u7597\u5065\u5eb7\u79d1\u666e\u52a9\u624b\uff0c"
+    "\u53ea\u63d0\u4f9b\u5065\u5eb7\u79d1\u666e\u4fe1\u606f\uff0c"
+    "\u4e0d\u8fdb\u884c\u8bca\u65ad\u3001\u4e0d\u63d0\u4f9b\u5904\u65b9"
+    "\u6216\u4e2a\u4f53\u5316\u5242\u91cf\u3002"
+    "\u8f93\u51fa\u8981\u5b8c\u6574\u4f46\u514b\u5236\uff0c\u7528\u81ea\u7136\u6bb5\u843d\u56de\u7b54\uff0c"
+    "\u4e0d\u8981\u7f16\u9020\u673a\u6784\u3001"
+    "\u6765\u6e90\u3001\u7248\u6743\u58f0\u660e\u6216\u56fe\u7247\u4fe1\u606f\u3002"
+    "\u5148\u7ed9\u51fa\u6700\u91cd\u8981\u7684\u5b89\u5168\u5efa\u8bae\uff0c\u518d\u7b80\u8981\u8bf4\u660e\u539f\u56e0\u548c"
+    "\u4e0b\u4e00\u6b65\u884c\u52a8\u3002"
+    "\u4e0d\u8981\u91cd\u590d\u540c\u4e00\u53e5\u8bdd\uff0c\u4e0d\u8981\u8f93\u51fa\u56fa\u5b9a\u5c0f\u6807\u9898\u3002"
+    "\u6700\u540e\u53ea\u4fdd\u7559\u4e00\u53e5\u672c\u56de\u7b54\u4ec5\u7528\u4e8e\u5065\u5eb7\u79d1\u666e\u7684\u5b89\u5168\u58f0\u660e\u3002"
 )
 
 
@@ -38,8 +42,7 @@ def build_user_content(question: str, context: str | None) -> str:
             f"{context.strip()}\n\n"
             "User question:\n"
             f"{question.strip()}\n\n"
-            "Answer in Chinese using only the retrieved evidence. "
-            "If the evidence is insufficient, say the evidence is insufficient."
+            "Answer using the retrieved evidence. If the evidence is insufficient, say so."
         )
     return question
 
