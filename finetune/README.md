@@ -225,12 +225,21 @@ finetune/eval_results/
 ```
 
 Metrics include safety compliance, medication safety, emergency awareness,
-format compliance, hallucination control, and keyword coverage. They are
-rule-based engineering checks and do not represent clinical accuracy.
+natural-format compliance, hallucination control, and keyword coverage. The
+natural-format check rewards concise paragraph answers with one safety boundary
+statement and penalizes repeated sentences, hallucinated source claims, or rigid
+template headings. These metrics are rule-based engineering checks and do not
+represent clinical accuracy.
+
+The inference prompt follows a paper-inspired generation policy: privately check
+for emergency signals, medication/dosage risk, and evidence sufficiency; ground
+the response on retrieved RAG evidence when provided; answer in one or two
+natural paragraphs; and keep exactly one medical safety disclaimer.
 
 ## Recommended Resume Positioning
 
 MediGuide-SFT uses MedQuAD official medical QA records to build an instruction
 fine-tuning dataset, then applies QLoRA to Qwen2.5-3B-Instruct on an RTX 4090.
 The model is optimized for medical education answers, safety refusal, emergency
-triage-style warnings, and source-aware response formatting.
+triage-style warnings, RAG evidence use, and concise safety-bounded response
+formatting.
