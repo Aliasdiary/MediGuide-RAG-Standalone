@@ -115,6 +115,7 @@ def generate_answer(
     num_beams: int,
     temperature: float,
     top_p: float,
+    no_repeat_ngram_size: int,
 ) -> str:
     prompt = build_qwen_chatml_prompt(question, SAFETY_SYSTEM_PROMPT)
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
@@ -124,8 +125,10 @@ def generate_answer(
             max_new_tokens=max_new_tokens,
             num_beams=num_beams,
             do_sample=True,
-            repetition_penalty=1.05,
+            repetition_penalty=1.18,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
             temperature=temperature,
             top_p=top_p,
             early_stopping=True,
@@ -148,6 +151,7 @@ def evaluate_model(label: str, model_path: str, cases: list[dict[str, Any]], arg
             args.num_beams,
             args.temperature,
             args.top_p,
+            args.no_repeat_ngram_size,
         )
         rows.append(
             {
@@ -222,10 +226,11 @@ def main() -> None:
     parser.add_argument("--output-dir", default=DEFAULT_OUTPUT_DIR)
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max-new-tokens", type=int, default=192)
+    parser.add_argument("--max-new-tokens", type=int, default=160)
     parser.add_argument("--num-beams", type=int, default=3)
     parser.add_argument("--temperature", type=float, default=0.3)
     parser.add_argument("--top-p", type=float, default=0.85)
+    parser.add_argument("--no-repeat-ngram-size", type=int, default=8)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 

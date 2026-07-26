@@ -28,11 +28,12 @@ SAFETY_SYSTEM_PROMPT = (
     "\u8f93\u51fa\u8981\u5b8c\u6574\u4f46\u514b\u5236\uff0c\u6bcf\u884c\u4e00\u5230\u4e24\u53e5\uff0c"
     "\u4e0d\u8981\u7f16\u9020\u673a\u6784\u3001"
     "\u6765\u6e90\u3001\u7248\u6743\u58f0\u660e\u6216\u56fe\u7247\u4fe1\u606f\u3002"
-    "\u4e25\u683c\u6309\u4ee5\u4e0b\u56db\u884c\u683c\u5f0f\u8f93\u51fa\uff1a\n"
-    "\u7ed3\u8bba\uff1a\n"
-    "\u539f\u56e0\uff1a\n"
-    "\u5efa\u8bae\uff1a\n"
-    "\u5b89\u5168\u8bf4\u660e\uff1a"
+    "\u4e25\u683c\u6309\u4ee5\u4e0b\u56db\u884c\u683c\u5f0f\u8f93\u51fa\uff0c"
+    "\u56db\u884c\u5185\u5bb9\u4e0d\u5f97\u91cd\u590d\uff1a\n"
+    "\u7ed3\u8bba\uff1a\u76f4\u63a5\u56de\u7b54\u8be5\u4e0d\u8be5\u505a\u4ec0\u4e48\u3002\n"
+    "\u539f\u56e0\uff1a\u7528\u4e00\u53e5\u8bdd\u8bf4\u660e\u98ce\u9669\u6216\u4f9d\u636e\u3002\n"
+    "\u5efa\u8bae\uff1a\u7ed9\u51fa\u975e\u5904\u65b9\u3001\u975e\u4e2a\u4f53\u5316\u7684\u4e0b\u4e00\u6b65\u884c\u52a8\u3002\n"
+    "\u5b89\u5168\u8bf4\u660e\uff1a\u53ea\u4fdd\u7559\u4e00\u53e5\u5b89\u5168\u8fb9\u754c\u58f0\u660e\u3002"
 )
 
 
@@ -62,11 +63,12 @@ def main() -> None:
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     parser.add_argument("--question", required=True)
     parser.add_argument("--context", default=None, help="Optional RAG retrieved evidence.")
-    parser.add_argument("--max-new-tokens", type=int, default=192)
-    parser.add_argument("--repetition-penalty", type=float, default=1.05)
+    parser.add_argument("--max-new-tokens", type=int, default=160)
+    parser.add_argument("--repetition-penalty", type=float, default=1.18)
     parser.add_argument("--num-beams", type=int, default=3)
     parser.add_argument("--temperature", type=float, default=0.3)
     parser.add_argument("--top-p", type=float, default=0.85)
+    parser.add_argument("--no-repeat-ngram-size", type=int, default=8)
     parser.add_argument("--no-sample", action="store_true")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -89,7 +91,9 @@ def main() -> None:
             num_beams=args.num_beams,
             do_sample=not args.no_sample,
             repetition_penalty=args.repetition_penalty,
+            no_repeat_ngram_size=args.no_repeat_ngram_size,
             eos_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.eos_token_id,
             temperature=None if args.no_sample else args.temperature,
             top_p=None if args.no_sample else args.top_p,
             early_stopping=True,

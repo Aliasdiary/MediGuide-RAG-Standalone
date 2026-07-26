@@ -198,7 +198,7 @@ python finetune/evaluate_sft.py --limit 5
 python finetune/evaluate_sft.py
 ```
 
-The default SFT generation length is `--max-new-tokens 192`, which is intended
+The default SFT generation length is `--max-new-tokens 160`, which is intended
 to complete the four-line safety format without encouraging long disclaimer
 drift. You can adjust it for debugging:
 
