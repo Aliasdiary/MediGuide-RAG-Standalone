@@ -1,7 +1,8 @@
 """Run the exported MediGuide SFT model with Transformers.
 
 This script uses the exported MediGuide SFT model with manual Qwen ChatML
-prompting and conservative beam sampling.
+prompting and conservative beam sampling. It can run with only a user question,
+or with retrieved RAG evidence passed through `--context`.
 """
 
 from __future__ import annotations
@@ -35,10 +36,23 @@ SAFETY_SYSTEM_PROMPT = (
 )
 
 
-def build_qwen_chatml_prompt(question: str, system_prompt: str) -> str:
+def build_user_content(question: str, context: str | None) -> str:
+    if context:
+        return (
+            "RAG retrieved evidence:\n"
+            f"{context.strip()}\n\n"
+            "User question:\n"
+            f"{question.strip()}\n\n"
+            "Answer using the retrieved evidence. If the evidence is insufficient, say so."
+        )
+    return question
+
+
+def build_qwen_chatml_prompt(question: str, system_prompt: str, context: str | None = None) -> str:
+    user_content = build_user_content(question, context)
     return (
         f"<|im_start|>system\n{system_prompt}<|im_end|>\n"
-        f"<|im_start|>user\n{question}<|im_end|>\n"
+        f"<|im_start|>user\n{user_content}<|im_end|>\n"
         "<|im_start|>assistant\n"
     )
 
@@ -47,6 +61,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Infer with exported MediGuide SFT model.")
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     parser.add_argument("--question", required=True)
+    parser.add_argument("--context", default=None, help="Optional RAG retrieved evidence.")
     parser.add_argument("--max-new-tokens", type=int, default=192)
     parser.add_argument("--repetition-penalty", type=float, default=1.05)
     parser.add_argument("--num-beams", type=int, default=3)
@@ -64,7 +79,7 @@ def main() -> None:
     ).to(args.device)
     model.eval()
 
-    prompt = build_qwen_chatml_prompt(args.question, SAFETY_SYSTEM_PROMPT)
+    prompt = build_qwen_chatml_prompt(args.question, SAFETY_SYSTEM_PROMPT, args.context)
     inputs = tokenizer(prompt, return_tensors="pt").to(args.device)
 
     with torch.no_grad():
