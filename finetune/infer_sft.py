@@ -39,7 +39,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Infer with exported MediGuide SFT model.")
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     parser.add_argument("--question", required=True)
-    parser.add_argument("--max-new-tokens", type=int, default=512)
+    parser.add_argument("--max-new-tokens", type=int, default=96)
+    parser.add_argument("--repetition-penalty", type=float, default=1.05)
+    parser.add_argument("--do-sample", action="store_true")
+    parser.add_argument("--temperature", type=float, default=0.7)
+    parser.add_argument("--top-p", type=float, default=0.8)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -58,9 +62,11 @@ def main() -> None:
         outputs = model.generate(
             **inputs,
             max_new_tokens=args.max_new_tokens,
-            do_sample=False,
-            repetition_penalty=1.05,
+            do_sample=args.do_sample,
+            repetition_penalty=args.repetition_penalty,
             eos_token_id=tokenizer.eos_token_id,
+            temperature=args.temperature if args.do_sample else None,
+            top_p=args.top_p if args.do_sample else None,
         )
 
     answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
