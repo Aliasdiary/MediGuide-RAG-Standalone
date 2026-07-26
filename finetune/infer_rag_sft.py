@@ -34,58 +34,6 @@ FINAL_DISCLAIMER = (
 )
 
 
-def is_medication_dose_question(question: str) -> bool:
-    medication_terms = [
-        "\u836f",
-        "\u7247",
-        "\u80f6\u56ca",
-        "\u5904\u65b9",
-        "\u964d\u538b",
-        "\u6297\u751f\u7d20",
-        "\u80f0\u5c9b\u7d20",
-        "\u6b62\u75db",
-    ]
-    adjustment_terms = [
-        "\u5242\u91cf",
-        "\u836f\u91cf",
-        "\u52a0\u500d",
-        "\u591a\u5403",
-        "\u5c11\u5403",
-        "\u505c\u836f",
-        "\u6362\u836f",
-        "\u8c03\u6574",
-        "\u600e\u4e48\u5403",
-    ]
-    return any(term in question for term in medication_terms) and any(
-        term in question for term in adjustment_terms
-    )
-
-
-def build_medication_dose_answer(docs: List[Document]) -> str:
-    focuses = []
-    for doc in docs:
-        focus = str(doc.metadata.get("focus", "")).strip()
-        if focus and focus not in focuses:
-            focuses.append(focus)
-    evidence_note = "\u68c0\u7d22\u5230\u7684 MedQuAD \u8d44\u6599"
-    if focuses:
-        focus_text = "\u3001".join(focuses[:2])
-        evidence_note += f"\uff08{focus_text}\uff09"
-
-    return (
-        "\u4e0d\u5efa\u8bae\u81ea\u884c\u8c03\u6574\u6216\u52a0\u500d\u836f\u7269\u5242\u91cf\u3002"
-        f"{evidence_note}\u63d0\u793a\uff0c\u9ad8\u8840\u538b\u7b49\u6162\u6027\u75be\u75c5\u7684\u6cbb\u7597"
-        "\u901a\u5e38\u9700\u8981\u751f\u6d3b\u65b9\u5f0f\u7ba1\u7406\u548c\u836f\u7269\u6cbb\u7597\u914d\u5408\uff0c"
-        "\u5177\u4f53\u7528\u836f\u7c7b\u578b\u3001\u8054\u5408\u65b9\u6848\u548c\u5242\u91cf\u5e94\u7531\u533b\u751f\u6216\u836f\u5e08"
-        "\u7ed3\u5408\u8840\u538b\u6c34\u5e73\u3001\u5408\u5e76\u75be\u75c5\u3001\u809d\u80be\u529f\u80fd\u548c\u6b63\u5728\u4f7f\u7528\u7684"
-        "\u5176\u4ed6\u836f\u7269\u7efc\u5408\u8bc4\u4f30\u3002\u81ea\u884c\u52a0\u91cf\u53ef\u80fd\u5bfc\u81f4\u4f4e\u8840\u538b\u3001"
-        "\u4e0d\u826f\u53cd\u5e94\u6216\u836f\u7269\u76f8\u4e92\u4f5c\u7528\uff1b\u5982\u679c\u8840\u538b\u63a7\u5236\u4e0d\u7406\u60f3\u3001"
-        "\u6f0f\u670d\u836f\u6216\u51fa\u73b0\u4e0d\u9002\uff0c\u5e94\u53ca\u65f6\u54a8\u8be2\u533b\u751f\u6216\u836f\u5e08\u540e\u518d"
-        "\u8c03\u6574\u65b9\u6848\u3002\n\n"
-        f"{FINAL_DISCLAIMER}"
-    )
-
-
 def load_rag_components(config: MediGuideConfig):
     data_module = DataPreparationModule(config.data_path)
     data_module.load_documents()
@@ -211,12 +159,6 @@ def clean_answer(answer: str) -> str:
     answer = answer.replace("Final answer in Chinese:", "").strip()
     answer = answer.replace("This answer is for health education only and cannot replace professional medical diagnosis or treatment.", "")
     answer = answer.replace("This answer is for health education only.", "")
-    answer = answer.replace("\u9ad8\u8840\u58d3", "\u9ad8\u8840\u538b")
-    answer = answer.replace("\u91ab\u751f", "\u533b\u751f")
-    answer = answer.replace("\u8a3a\u65b7", "\u8bca\u65ad")
-    answer = answer.replace("\u8655\u65b9", "\u5904\u65b9")
-    answer = answer.replace("\u6cbb\u7642", "\u6cbb\u7597")
-    answer = answer.replace("\u5efa\u8b70", "\u5efa\u8bae")
     answer = re.sub(r"\n{3,}", "\n\n", answer).strip()
     if FINAL_DISCLAIMER not in answer and "\u4e0d\u80fd\u66ff\u4ee3\u533b\u751f" not in answer:
         answer = f"{answer}\n\n{FINAL_DISCLAIMER}".strip()
@@ -295,11 +237,8 @@ def main() -> None:
         )
 
     answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
-    answer = clean_answer(answer)
-    if is_medication_dose_question(args.question):
-        answer = build_medication_dose_answer(docs)
     print("\nRAG-grounded SFT answer:")
-    print(answer)
+    print(clean_answer(answer))
 
 
 if __name__ == "__main__":
