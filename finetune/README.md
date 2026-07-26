@@ -1,6 +1,6 @@
 # MediGuide-SFT / QLoRA Fine-Tuning
 
-This folder turns the existing MedQuAD RAG project into a RAG-grounded SFT/QLoRA
+This folder turns the existing MedQuAD project into a standalone SFT/QLoRA
 workflow. The recommended AutoDL setup is:
 
 - GPU: RTX 4090 24GB
@@ -9,8 +9,8 @@ workflow. The recommended AutoDL setup is:
 - Trainer: LLaMA-Factory
 
 The fine-tuning goal is not to memorize all medical facts. It teaches the model
-to consume retrieved RAG evidence, produce safer medical education answers, cite
-source metadata, refuse unsafe requests, and handle emergency-signal questions.
+to produce safer medical education answers, cite source metadata, refuse unsafe
+requests, and handle emergency-signal questions.
 
 ## 1. Prepare Environment On AutoDL
 
@@ -205,14 +205,6 @@ drift. You can adjust it for debugging:
 ```bash
 python finetune/infer_sft.py --question "..." --max-new-tokens 256
 python finetune/evaluate_sft.py --max-new-tokens 256
-```
-
-RAG-grounded SFT inference can also pass retrieved evidence directly:
-
-```bash
-python finetune/infer_sft.py \
-  --question "Can I double my blood pressure medicine dose?" \
-  --context "Organization: NIH. URL: ... Evidence: medication dosage should be adjusted by clinicians."
 ```
 
 The script writes:

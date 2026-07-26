@@ -101,11 +101,10 @@ full MedQuAD + BGE-M3 + FAISS/BM25 + RRF + citation workflow. The metrics are
 engineering evaluation numbers only and do not represent clinical diagnostic
 accuracy.
 
-## RAG-grounded SFT / QLoRA Fine-Tuning
+## SFT / QLoRA Fine-Tuning
 
-The project also includes a RAG-grounded SFT path for AutoDL RTX 4090 experiments.
-It builds Alpaca-style medical instruction data from MedQuAD where each sample contains
-a user question plus retrieved evidence/source metadata, then fine-tunes
+The project also includes a non-RAG SFT path for AutoDL RTX 4090 experiments.
+It builds Alpaca-style medical instruction data from MedQuAD and fine-tunes
 `Qwen/Qwen2.5-3B-Instruct` with LLaMA-Factory QLoRA.
 
 ```bash
@@ -138,4 +137,4 @@ llamafactory-cli train /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/qwen25
 See `finetune/README.md` for the full AutoDL environment setup and training
 notes, including the recommended `base -> med-sft` cloned environment and a
 separate later `med-vllm` inference environment. Ollama models remain useful
-for the RAG generation baseline, but they are not used as SFT training bases.
+for local inference baselines, but they are not used as SFT training bases.
