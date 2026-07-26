@@ -114,14 +114,29 @@ def format_evidence(docs: List[Document], max_chars: int) -> str:
 
 def build_rag_grounded_question(question: str, evidence: str) -> str:
     return (
-        "Answer the user's medical question in Chinese using the MedQuAD evidence below. "
-        "Do not answer in English. If the evidence is insufficient, say that the retrieved "
-        "evidence is insufficient instead of inventing sources or conclusions. "
-        "Do not diagnose, prescribe, or give personalized dosage advice. "
-        "For medication adjustment questions, advise the user to consult a doctor or pharmacist.\n\n"
+        "You are answering a medical health-education question with retrieved MedQuAD evidence. "
+        "First infer the user's task type internally: medication safety or dosage, symptom risk "
+        "or care urgency, disease education, test or treatment explanation, or unsupported question. "
+        "Do not output the task label or your reasoning. "
+        "Use only evidence that directly helps answer the user's question; ignore unrelated background, "
+        "long treatment lists, duplicate passages, and off-topic evidence. "
+        "Do not copy long evidence passages. Summarize the relevant point in your own Chinese words. "
+        "If the retrieved evidence is insufficient or off topic, say the current retrieved evidence is "
+        "insufficient and avoid inventing sources or conclusions. "
+        "For medication safety or dosage questions, do not give a personalized dose and tell the user "
+        "to consult a doctor or pharmacist before changing medication. "
+        "For symptom-risk questions, prioritize timely medical care or emergency care when appropriate "
+        "without making a diagnosis. "
+        "For disease education questions, explain the definition, common signs, risks, prevention, or "
+        "general management only when supported by the evidence. "
+        "For test or treatment questions, explain the purpose, general use, and cautions without replacing "
+        "a clinician's plan. "
+        "Answer in Chinese with 3 to 5 natural sentences: start with a direct answer, then give the "
+        "evidence-based reason, then give the next action. Put the safety boundary only in the final sentence. "
+        "Do not use bullet lists unless the user asks for a list. Do not repeat sentences. Do not answer in English.\n\n"
         f"User question: {question}\n\n"
         f"MedQuAD evidence:\n{evidence}\n\n"
-        "Give a concise, readable, safety-bounded Chinese answer."
+        "Final answer in Chinese:"
     )
 
 
