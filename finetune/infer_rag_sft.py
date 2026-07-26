@@ -118,10 +118,7 @@ def build_rag_grounded_question(question: str, evidence: str) -> str:
         "Do not answer in English. If the evidence is insufficient, say that the retrieved "
         "evidence is insufficient instead of inventing sources or conclusions. "
         "Do not diagnose, prescribe, or give personalized dosage advice. "
-        "For medication adjustment questions, advise the user to consult a doctor or pharmacist. "
-        "Write 3 to 5 Chinese sentences: first give the direct safety recommendation, "
-        "then explain the reason from the evidence, then give the next action. "
-        "Put the health disclaimer only in the final sentence.\n\n"
+        "For medication adjustment questions, advise the user to consult a doctor or pharmacist.\n\n"
         f"User question: {question}\n\n"
         f"MedQuAD evidence:\n{evidence}\n\n"
         "Give a concise, readable, safety-bounded Chinese answer."
@@ -153,9 +150,9 @@ def main() -> None:
         help="Embedding model name or local path. Use a local BGE-M3 path on AutoDL if HuggingFace is unreachable.",
     )
     parser.add_argument("--index-save-path", default=None, help="Optional FAISS index directory.")
-    parser.add_argument("--top-k", type=int, default=1)
-    parser.add_argument("--max-context-chars", type=int, default=2200)
-    parser.add_argument("--max-new-tokens", type=int, default=240)
+    parser.add_argument("--top-k", type=int, default=4)
+    parser.add_argument("--max-context-chars", type=int, default=6000)
+    parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -194,7 +191,6 @@ def main() -> None:
             do_sample=False,
             repetition_penalty=1.05,
             eos_token_id=tokenizer.eos_token_id,
-            pad_token_id=tokenizer.eos_token_id,
         )
 
     answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
