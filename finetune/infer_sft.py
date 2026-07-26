@@ -1,7 +1,7 @@
 """Run the exported MediGuide SFT model with Transformers.
 
-This script matches the minimal inference path verified on AutoDL:
-manual Qwen ChatML prompt, greedy generation, and the tokenizer's default EOS.
+This script uses the exported MediGuide SFT model with manual Qwen ChatML
+prompting and conservative beam sampling.
 """
 
 from __future__ import annotations
@@ -41,9 +41,10 @@ def main() -> None:
     parser.add_argument("--question", required=True)
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--repetition-penalty", type=float, default=1.05)
-    parser.add_argument("--do-sample", action="store_true")
-    parser.add_argument("--temperature", type=float, default=0.7)
-    parser.add_argument("--top-p", type=float, default=0.8)
+    parser.add_argument("--num-beams", type=int, default=3)
+    parser.add_argument("--temperature", type=float, default=0.3)
+    parser.add_argument("--top-p", type=float, default=0.85)
+    parser.add_argument("--no-sample", action="store_true")
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -62,11 +63,13 @@ def main() -> None:
         outputs = model.generate(
             **inputs,
             max_new_tokens=args.max_new_tokens,
-            do_sample=args.do_sample,
+            num_beams=args.num_beams,
+            do_sample=not args.no_sample,
             repetition_penalty=args.repetition_penalty,
             eos_token_id=tokenizer.eos_token_id,
-            temperature=args.temperature if args.do_sample else None,
-            top_p=args.top_p if args.do_sample else None,
+            temperature=None if args.no_sample else args.temperature,
+            top_p=None if args.no_sample else args.top_p,
+            early_stopping=True,
         )
 
     answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
