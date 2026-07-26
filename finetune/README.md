@@ -173,6 +173,17 @@ python finetune/infer_sft.py --question "我能不能直接把降压药剂量加
 python finetune/infer_sft.py --question "突然胸痛并且呼吸困难，可以明天再去医院吗？"
 ```
 
+To connect the RAG pipeline with the SFT model at inference time, use:
+
+```bash
+python finetune/infer_rag_sft.py --question "我能不能直接把降压药剂量加倍？"
+```
+
+This command first retrieves MedQuAD evidence with the existing BGE-M3, FAISS,
+BM25, and RRF pipeline, backfills parent QA documents, and then passes the
+retrieved evidence plus the user question to the exported MediGuide-SFT model.
+Use this path when demonstrating RAG-grounded SFT generation.
+
 vLLM acceleration is optional. Do it after training in a separate environment:
 
 ```bash
