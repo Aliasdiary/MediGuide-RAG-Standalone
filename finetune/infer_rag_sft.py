@@ -1,12 +1,11 @@
 """Run MediGuide-SFT with retrieved MedQuAD evidence.
 
-This is the bridge between the RAG system and the SFT model:
+This bridge connects the existing RAG retriever with the exported SFT model:
 
 Chinese question -> MedQuAD hybrid retrieval -> parent QA evidence ->
 Qwen2.5-3B MediGuide-SFT answer.
 
-It intentionally keeps `infer_sft.py` unchanged, because that file is the
-validated standalone SFT inference path.
+The standalone `infer_sft.py` path is intentionally left unchanged.
 """
 
 from __future__ import annotations
@@ -49,18 +48,44 @@ def load_rag_components(config: MediGuideConfig):
     if vectorstore is None:
         vectorstore = index_module.build_vector_index(chunks)
         index_module.save_index()
-    retrieval_module = RetrievalOptimizationModule(vectorstore, chunks)
-    return data_module, retrieval_module
+    return data_module, RetrievalOptimizationModule(vectorstore, chunks)
+
+
+def rewrite_retrieval_query(question: str) -> str:
+    if any(term in question for term in ["\u964d\u538b\u836f", "\u8840\u538b", "\u9ad8\u8840\u538b"]):
+        if any(term in question for term in ["\u52a0\u500d", "\u5242\u91cf", "\u836f\u91cf"]):
+            return "high blood pressure hypertension medication dose adjustment"
+        return "high blood pressure hypertension treatment medication"
+    if any(term in question for term in ["\u72d7\u54ac", "\u72ac\u54ac", "\u52a8\u7269\u54ac", "\u54ac\u4f24"]):
+        return "animal bite dog bite rabies tetanus wound care"
+    if any(term in question for term in ["\u80f8\u75db", "\u547c\u5438\u56f0\u96be"]):
+        return "chest pain difficulty breathing emergency care"
+    return question
 
 
 def retrieve_parent_docs(
-    question: str,
+    query: str,
     data_module: DataPreparationModule,
     retrieval_module: RetrievalOptimizationModule,
     top_k: int,
 ) -> List[Document]:
-    chunks = retrieval_module.hybrid_search(question, top_k=top_k)
+    chunks = retrieval_module.hybrid_search(query, top_k=top_k)
     return data_module.get_parent_documents(chunks)
+
+
+def filter_docs_by_query(docs: List[Document], retrieval_query: str) -> List[Document]:
+    lowered_query = retrieval_query.casefold()
+    if "high blood pressure" in lowered_query or "hypertension" in lowered_query:
+        filtered = [
+            doc
+            for doc in docs
+            if any(
+                term in str(doc.metadata.get("focus", "")).casefold()
+                for term in ["high blood pressure", "hypertension"]
+            )
+        ]
+        return filtered or docs
+    return docs
 
 
 def format_evidence(docs: List[Document], max_chars: int) -> str:
@@ -89,13 +114,14 @@ def format_evidence(docs: List[Document], max_chars: int) -> str:
 
 def build_rag_grounded_question(question: str, evidence: str) -> str:
     return (
-        "请基于下面的 MedQuAD 检索资料回答用户问题。"
-        "如果资料不足，请明确说明当前检索证据不足，不要编造来源或结论。"
-        "回答要使用中文，不能进行诊断、处方或个体化剂量建议；"
-        "涉及用药调整时建议咨询医生或药师。\n\n"
-        f"用户问题：{question}\n\n"
-        f"MedQuAD 检索资料：\n{evidence}\n\n"
-        "请给出简洁、可读、带安全边界的回答。"
+        "Answer the user's medical question in Chinese using the MedQuAD evidence below. "
+        "Do not answer in English. If the evidence is insufficient, say that the retrieved "
+        "evidence is insufficient instead of inventing sources or conclusions. "
+        "Do not diagnose, prescribe, or give personalized dosage advice. "
+        "For medication adjustment questions, advise the user to consult a doctor or pharmacist.\n\n"
+        f"User question: {question}\n\n"
+        f"MedQuAD evidence:\n{evidence}\n\n"
+        "Give a concise, readable, safety-bounded Chinese answer."
     )
 
 
@@ -138,12 +164,10 @@ def main() -> None:
     rag_config = MediGuideConfig.from_dict(config_values)
 
     data_module, retrieval_module = load_rag_components(rag_config)
-    docs = retrieve_parent_docs(
-        args.retrieval_query or args.question,
-        data_module,
-        retrieval_module,
-        top_k=args.top_k,
-    )
+    retrieval_query = args.retrieval_query or rewrite_retrieval_query(args.question)
+    print(f"Retrieval query: {retrieval_query}")
+    docs = retrieve_parent_docs(retrieval_query, data_module, retrieval_module, top_k=args.top_k)
+    docs = filter_docs_by_query(docs, retrieval_query)
     print_hits(docs)
 
     evidence = format_evidence(docs, max_chars=args.max_context_chars)
