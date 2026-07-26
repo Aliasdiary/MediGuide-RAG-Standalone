@@ -1,0 +1,10 @@
+model_name_or_path: /root/autodl-tmp/models/Qwen2.5-3B-Instruct
+adapter_name_or_path: /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/output/qwen25-3b-mediguide-qlora
+template: qwen
+finetuning_type: lora
+trust_remote_code: true
+
+export_dir: /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export/qwen25-3b-mediguide-sft
+export_size: 2
+export_device: cpu
+export_legacy_format: false

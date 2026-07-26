@@ -145,7 +145,7 @@ llamafactory-cli train /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/qwen25
 If CUDA memory is tight, reduce `cutoff_len` from `2048` to `1536` or reduce
 `lora_rank` from `16` to `8`.
 
-## 6. Export Or Inference
+## 6. Export And Inference
 
 The first useful artifact is the LoRA adapter under:
 
@@ -153,10 +153,27 @@ The first useful artifact is the LoRA adapter under:
 /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/output/qwen25-3b-mediguide-qlora
 ```
 
-You can load it in LLaMA-Factory for inference, or export/merge later if you
-need an independent model artifact.
+Merge the LoRA adapter into the base model before standalone inference:
 
-For vLLM acceleration, do it after training in a separate environment:
+```bash
+llamafactory-cli export /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export_qwen25_3b_mediguide.yaml
+```
+
+The exported full model is written to:
+
+```text
+/root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export/qwen25-3b-mediguide-sft
+```
+
+If vLLM is unavailable or the server environment has CUDA/cuDNN version
+conflicts, run the exported model with Transformers:
+
+```bash
+python finetune/infer_sft.py --question "我能不能直接把降压药剂量加倍？"
+python finetune/infer_sft.py --question "突然胸痛并且呼吸困难，可以明天再去医院吗？"
+```
+
+vLLM acceleration is optional. Do it after training in a separate environment:
 
 ```bash
 source /root/miniconda3/etc/profile.d/conda.sh
@@ -167,8 +184,9 @@ pip install vllm openai pandas tqdm \
   -i http://mirrors.aliyun.com/pypi/simple --trusted-host mirrors.aliyun.com
 ```
 
-Then serve the exported or merged model with vLLM. Do not run vLLM and training
-at the same time on one RTX 4090, because they will compete for GPU memory.
+Then serve the exported model with vLLM if the dependency stack is compatible.
+Do not run vLLM and training at the same time on one RTX 4090, because they
+will compete for GPU memory.
 
 ## Recommended Resume Positioning
 
