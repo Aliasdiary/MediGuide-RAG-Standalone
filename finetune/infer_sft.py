@@ -32,11 +32,22 @@ def build_qwen_chatml_prompt(question: str, system_prompt: str) -> str:
     )
 
 
+def qwen_eos_token_ids(tokenizer: AutoTokenizer) -> list[int]:
+    token_ids = []
+    for token in ("<|im_end|>", "<|endoftext|>"):
+        token_id = tokenizer.convert_tokens_to_ids(token)
+        if isinstance(token_id, int) and token_id >= 0:
+            token_ids.append(token_id)
+    if tokenizer.eos_token_id is not None:
+        token_ids.append(tokenizer.eos_token_id)
+    return sorted(set(token_ids))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Infer with exported MediGuide SFT model.")
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     parser.add_argument("--question", required=True)
-    parser.add_argument("--max-new-tokens", type=int, default=512)
+    parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -56,8 +67,9 @@ def main() -> None:
             **inputs,
             max_new_tokens=args.max_new_tokens,
             do_sample=False,
-            repetition_penalty=1.05,
-            eos_token_id=tokenizer.eos_token_id,
+            repetition_penalty=1.15,
+            no_repeat_ngram_size=8,
+            eos_token_id=qwen_eos_token_ids(tokenizer),
             pad_token_id=tokenizer.eos_token_id,
             temperature=None,
             top_p=None,
@@ -65,7 +77,8 @@ def main() -> None:
         )
 
     answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
-    print(answer.strip())
+    answer = answer.split("<|im_end|>", 1)[0].strip()
+    print(answer)
 
 
 if __name__ == "__main__":
