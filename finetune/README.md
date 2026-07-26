@@ -184,6 +184,16 @@ BM25, and RRF pipeline, backfills parent QA documents, and then passes the
 retrieved evidence plus the user question to the exported MediGuide-SFT model.
 Use this path when demonstrating RAG-grounded SFT generation.
 
+If AutoDL cannot connect to HuggingFace, download BGE-M3 with ModelScope and
+pass the local embedding path:
+
+```bash
+modelscope download --model BAAI/bge-m3 --local_dir /root/autodl-tmp/models/bge-m3
+python finetune/infer_rag_sft.py \
+  --question "我能不能直接把降压药剂量加倍？" \
+  --embedding-model /root/autodl-tmp/models/bge-m3
+```
+
 vLLM acceleration is optional. Do it after training in a separate environment:
 
 ```bash

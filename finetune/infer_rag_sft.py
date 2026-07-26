@@ -118,13 +118,26 @@ def main() -> None:
     parser.add_argument("--model-path", default=DEFAULT_MODEL_PATH)
     parser.add_argument("--question", required=True)
     parser.add_argument("--retrieval-query", default=None, help="Optional explicit query for retrieval.")
+    parser.add_argument(
+        "--embedding-model",
+        default=None,
+        help="Embedding model name or local path. Use a local BGE-M3 path on AutoDL if HuggingFace is unreachable.",
+    )
+    parser.add_argument("--index-save-path", default=None, help="Optional FAISS index directory.")
     parser.add_argument("--top-k", type=int, default=4)
     parser.add_argument("--max-context-chars", type=int, default=6000)
     parser.add_argument("--max-new-tokens", type=int, default=512)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
-    data_module, retrieval_module = load_rag_components(DEFAULT_CONFIG)
+    config_values = DEFAULT_CONFIG.to_dict()
+    if args.embedding_model:
+        config_values["embedding_model"] = args.embedding_model
+    if args.index_save_path:
+        config_values["index_save_path"] = args.index_save_path
+    rag_config = MediGuideConfig.from_dict(config_values)
+
+    data_module, retrieval_module = load_rag_components(rag_config)
     docs = retrieve_parent_docs(
         args.retrieval_query or args.question,
         data_module,
