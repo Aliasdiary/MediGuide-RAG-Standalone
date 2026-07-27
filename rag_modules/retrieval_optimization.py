@@ -4,7 +4,7 @@ Hybrid retrieval module for MediGuide-RAG.
 
 import hashlib
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from langchain_community.retrievers import BM25Retriever
 from langchain_community.vectorstores import FAISS
@@ -16,10 +16,20 @@ logger = logging.getLogger(__name__)
 class RetrievalOptimizationModule:
     """Combines dense retrieval and BM25 with RRF reranking."""
 
-    def __init__(self, vectorstore: FAISS, chunks: List[Document]):
+    def __init__(
+        self,
+        vectorstore: FAISS,
+        chunks: List[Document],
+        use_cross_encoder_reranker: bool = False,
+        reranker_model: str = "BAAI/bge-reranker-base",
+    ):
         self.vectorstore = vectorstore
         self.chunks = chunks
+        self.use_cross_encoder_reranker = use_cross_encoder_reranker
+        self.reranker_model = reranker_model
+        self.cross_encoder = None
         self.setup_retrievers()
+        self.setup_reranker()
 
     def setup_retrievers(self):
         self.vector_retriever = self.vectorstore.as_retriever(
@@ -28,15 +38,30 @@ class RetrievalOptimizationModule:
         )
         self.bm25_retriever = BM25Retriever.from_documents(self.chunks, k=8)
 
+    def setup_reranker(self):
+        if not self.use_cross_encoder_reranker:
+            return
+        try:
+            from sentence_transformers import CrossEncoder
+
+            self.cross_encoder = CrossEncoder(self.reranker_model)
+            logger.info("Loaded Cross-Encoder reranker: %s", self.reranker_model)
+        except Exception as exc:  # pragma: no cover - optional runtime dependency/model
+            logger.warning("Cross-Encoder reranker disabled: %s", exc)
+            self.cross_encoder = None
+
     def hybrid_search(self, query: str, top_k: int = 4) -> List[Document]:
         candidate_k = max(8, top_k * 2)
         vector_docs, bm25_docs = self._retrieve_candidates(query, candidate_k)
-        return self._rrf_rerank(vector_docs, bm25_docs, query=query)[:top_k]
+        candidates = self._rrf_rerank(vector_docs, bm25_docs, query=query)
+        candidates = self._cross_encoder_rerank(query, candidates)
+        return self._dedupe_by_parent(candidates)[:top_k]
 
     def metadata_filtered_search(self, query: str, filters: Dict[str, Any], top_k: int = 4) -> List[Document]:
         candidate_k = max(64, top_k * 16)
         vector_docs, bm25_docs = self._retrieve_candidates(query, candidate_k)
         candidates = self._rrf_rerank(vector_docs, bm25_docs, query=query)
+        candidates = self._cross_encoder_rerank(query, candidates)
         filtered = []
         for doc in candidates:
             matched = True
@@ -56,7 +81,7 @@ class RetrievalOptimizationModule:
         if filtered:
             return filtered
         logger.info("Metadata filters returned no results; falling back to unfiltered hybrid retrieval")
-        return candidates[:top_k]
+        return self._dedupe_by_parent(candidates)[:top_k]
 
     def _retrieve_candidates(self, query: str, candidate_k: int):
         vector_docs = self.vectorstore.similarity_search(query, k=candidate_k)
@@ -101,3 +126,31 @@ class RetrievalOptimizationModule:
             results.append(doc)
         logger.info("RRF rerank: vector=%s bm25=%s merged=%s", len(vector_docs), len(bm25_docs), len(results))
         return results
+
+    def _cross_encoder_rerank(self, query: str, docs: List[Document]) -> List[Document]:
+        if not self.cross_encoder or not docs:
+            return docs
+        pairs = [(query, doc.page_content) for doc in docs]
+        scores = self.cross_encoder.predict(pairs)
+        for doc, score in zip(docs, scores):
+            doc.metadata["cross_encoder_score"] = float(score)
+        return sorted(
+            docs,
+            key=lambda doc: (
+                float(doc.metadata.get("cross_encoder_score", 0.0)),
+                float(doc.metadata.get("rrf_score", 0.0)),
+            ),
+            reverse=True,
+        )
+
+    @staticmethod
+    def _dedupe_by_parent(docs: List[Document]) -> List[Document]:
+        seen = set()
+        unique = []
+        for doc in docs:
+            parent_id = doc.metadata.get("parent_id") or doc.metadata.get("chunk_id")
+            if parent_id in seen:
+                continue
+            seen.add(parent_id)
+            unique.append(doc)
+        return unique

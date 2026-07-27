@@ -1,140 +1,135 @@
 # MediGuide-RAG Standalone
 
-这是从原 RAG 工程中完整提取的独立项目，可在当前目录直接运行。项目使用 MedQuAD
-可靠医疗问答数据、BGE-M3、FAISS、BM25、RRF 和本地 Ollama Qwen3，实现中文医疗
-知识问答、风险提示与来源追溯。
+**基于混合检索与 Retrieval-Aware SFT 的医疗健康问答 Agent**
 
-> 本项目仅用于健康科普和研究，不能替代医生诊断、处方或急救服务。
+本项目面向医疗健康科普与风险提示场景，构建一个可本地运行的医疗问答 Agent。系统通过 MedQuAD 可靠医疗知识库、跨语言混合检索、证据门控、Retrieval-Aware SFT 和医疗安全校验，提升回答的可追溯性、证据一致性和安全边界。
 
-## 目录
+> 本项目仅用于健康科普、RAG/SFT 工程研究与简历展示，不能替代医生诊断、处方、个体化剂量建议或急救服务。
+
+## Project Structure
 
 ```text
 MediGuide-RAG-Standalone/
-├── run.py                     # CLI 入口
-├── config.py                  # 独立路径与模型配置
-├── requirements.txt
-├── rag_modules/               # ETL 后的数据加载、索引、检索和生成模块
+├── run.py                         # 原 RAG CLI 入口，保留 Ollama Qwen3 生成链路
+├── config.py                      # 数据、索引、Embedding、RAG-SFT 参数
+├── rag_modules/
+│   ├── data_preparation.py        # MedQuAD JSONL 读取、父子文档建模
+│   ├── index_construction.py      # BGE-M3 Embedding + FAISS 本地索引
+│   ├── retrieval_optimization.py  # FAISS + BM25 + RRF + 可选 Cross-Encoder reranker
+│   ├── evidence_gate.py           # 证据门控、主体一致性、动态 Top-K
+│   └── generation_integration.py  # 原 Ollama RAG 生成模块
 ├── scripts/
-│   └── prepare_medquad.py     # MedQuAD 下载、清洗和抽样
-├── tests/
+│   ├── prepare_medquad.py         # MedQuAD 下载、XML 解析、清洗、抽样
+│   └── evaluate.py                # RAG vs LLM-only 工程评估
+├── finetune/
+│   ├── build_sft_dataset.py       # 原医疗科普 SFT 数据
+│   ├── build_retrieval_aware_sft_dataset.py
+│   ├── infer_sft.py               # 纯 SFT 推理
+│   ├── infer_rag_sft.py           # RAG 检索证据 + SFT 统一生成
+│   ├── evaluate_sft.py            # Base vs SFT 评估
+│   └── qwen25_3b_qlora_retrieval_sft.yaml
 ├── data/
 │   ├── medquad_5000.jsonl
 │   └── medquad_5000.manifest.json
-├── medical_vector_index/      # 已构建 FAISS 索引
-├── docs/
-└── THIRD_PARTY_NOTICES.md
+├── medical_vector_index/          # FAISS Flat 本地索引与 manifest
+└── docs/
 ```
 
-数据路径和索引路径均根据 `config.py` 所在位置计算，因此可以从任意工作目录启动，
-不依赖原仓库中的其他代码或数据。
+## Architecture
 
-## 环境要求
+```text
+用户中文问题
+-> 风险/意图识别与双语查询扩展
+-> BGE-M3 + FAISS 语义检索
+-> BM25 关键词检索
+-> RRF 融合排序
+-> 可选 Cross-Encoder Reranker
+-> Parent Document 去重与回填
+-> Evidence Gate 证据门控
+-> Retrieval-Aware Qwen2.5-3B SFT 生成
+-> 生成后安全与格式校验
+```
 
-- Python 3.10 或 3.11
-- Ollama
-- 本地模型 `qwen3:latest`
-- 首次安装依赖或重新下载 BGE-M3 时需要网络
+## Key Design
 
-## 安装与运行
+- **MedQuAD ETL**：从公开 MedQuAD 数据集中解析 XML，完成清洗、分层抽样、JSONL 转换和版本管理，保留 `focus`、`question_type`、`source_org`、`source_url`、`semantic_type` 等元数据。
+- **父子文档建模**：完整问答作为 Parent Document，问题文本作为 Child Chunk，检索阶段命中短问题，生成阶段回填完整问答上下文。
+- **跨语言混合检索**：使用 BGE-M3 处理中英文语义匹配，结合 FAISS 和 BM25 多路召回，并用 RRF 融合排名。
+- **证据门控**：`EvidenceGate` 对候选证据做主体一致性、问题类型、医学关键词和风险场景检查，输出 `sufficient`、`partial`、`insufficient`、`subject_mismatch` 等状态。
+- **Retrieval-Aware SFT**：用真实 RAG 召回结果构造训练输入，让 Qwen2.5-3B-Instruct 学习在候选证据中筛选、拒绝错配证据，并生成更符合医疗科普边界的回答。
 
-```powershell
-cd MediGuide-RAG-Standalone
+## Quick Start
+
+```bash
 pip install -r requirements.txt
+python run.py
+```
+
+如果使用原 RAG 生成链路，需要本地 Ollama：
+
+```bash
 ollama pull qwen3:latest
 python run.py
 ```
 
-项目已经包含 5,000 条 MedQuAD 数据和对应 FAISS 索引。BGE-M3 首次加载时仍需存在于
-Hugging Face 本地缓存；如果没有，程序会自动下载。
+如果使用 RAG-SFT 统一推理，需要先准备 Qwen2.5-3B SFT 合并模型：
 
-## 重新准备数据
-
-```powershell
-python scripts\prepare_medquad.py --limit 5000 --seed 42
+```bash
+python finetune/infer_rag_sft.py \
+  --question "我能不能直接把降压药剂量加倍？" \
+  --embedding-model /root/autodl-tmp/models/bge-m3 \
+  --model-path /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export/qwen25-3b-mediguide-sft
 ```
 
-该命令会从 MedQuAD 官方仓库下载 XML，校验许可证，排除无答案子集，重新生成 JSONL
-和数据 manifest。数据变化后，下一次运行会根据指纹自动重建 FAISS 索引。
+## Retrieval-Aware SFT
 
-## 测试
+构造检索感知训练数据：
 
-```powershell
-python -m unittest discover -s tests -v
+```bash
+python finetune/build_retrieval_aware_sft_dataset.py \
+  --input data/medquad_5000.jsonl \
+  --output-dir finetune/retrieval_aware_data \
+  --train-size 4000 \
+  --valid-size 300 \
+  --embedding-model /root/autodl-tmp/models/bge-m3
 ```
 
-## Workflow
+在 AutoDL RTX 4090 上训练：
 
-```text
-中文问题
-→ triage / education / medication / treatment 意图路由
-→ Qwen3 英文查询改写
-→ 医学同义词扩展
-→ BGE-M3 + FAISS / BM25
-→ RRF 融合与 focus 主题加权
-→ question_type 元数据过滤
-→ 完整问答父文档回填
-→ 危险信号与安全 Prompt
-→ 中文回答、来源机构和原始 URL
+```bash
+llamafactory-cli train /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/qwen25_3b_qlora_retrieval_sft.yaml
 ```
 
-项目设计和简历说明见
-`docs/mediguide_project_description.md`。
+导出合并模型：
+
+```bash
+llamafactory-cli export /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export_qwen25_3b_mediguide.yaml
+```
 
 ## Evaluation
 
-The project includes a reproducible binary evaluation between `LLM-only` and
-the full `MediGuide-RAG` workflow.
-
-```powershell
-python scripts\evaluate.py --limit 10
-python scripts\evaluate.py
-```
-
-Outputs are written to `eval_results/`:
-
-- `metrics.json`: aggregate metrics and percentage-point gains.
-- `predictions.jsonl`: per-question answers, retrieval hits, and scores.
-- `report.md`: resume-friendly comparison table.
-
-The current 40-case run compares local `qwen3:latest` without RAG against the
-full MedQuAD + BGE-M3 + FAISS/BM25 + RRF + citation workflow. The metrics are
-engineering evaluation numbers only and do not represent clinical diagnostic
-accuracy.
-
-## SFT / QLoRA Fine-Tuning
-
-The project also includes a non-RAG SFT path for AutoDL RTX 4090 experiments.
-It builds Alpaca-style medical instruction data from MedQuAD and fine-tunes
-`Qwen/Qwen2.5-3B-Instruct` with LLaMA-Factory QLoRA.
+RAG 主链路评估：
 
 ```bash
-python finetune/build_sft_dataset.py \
-  --input data/medquad_5000.jsonl \
-  --output-dir finetune/llamafactory_data \
-  --train-size 4500 \
-  --valid-size 300
+python scripts/evaluate.py
 ```
 
-On AutoDL:
+SFT 基线评估：
 
 ```bash
-cd /root/autodl-tmp
-git clone https://github.com/Aliasdiary/MediGuide-RAG-Standalone.git
-
-modelscope download --model Qwen/Qwen2.5-3B-Instruct \
-  --local_dir /root/autodl-tmp/models/Qwen2.5-3B-Instruct
-
-cd /root/autodl-tmp/MediGuide-RAG-Standalone
-python finetune/build_sft_dataset.py \
-  --input data/medquad_5000.jsonl \
-  --output-dir finetune/llamafactory_data \
-  --train-size 4500 \
-  --valid-size 300
-
-llamafactory-cli train /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/qwen25_3b_qlora_sft.yaml
+python finetune/evaluate_sft.py
 ```
 
-See `finetune/README.md` for the full AutoDL environment setup and training
-notes, including the recommended `base -> med-sft` cloned environment and a
-separate later `med-vllm` inference environment. Ollama models remain useful
-for local inference baselines, but they are not used as SFT training bases.
+文本污染扫描：
+
+```bash
+python finetune/scan_text_contamination.py finetune data
+```
+
+已有基线结果：
+
+- MediGuide-SFT 相比 Qwen2.5-3B-Instruct，医学关键词覆盖率由 **67.9%** 提升至 **74.6%**。
+- 急症风险提示率由 **95.0%** 提升至 **100.0%**。
+- 综合可用性由 **77.1%** 提升至 **79.1%**。
+- 原 RAG 系统相比 LLM-only，综合可用性由 **75.0%** 提升至 **98.7%**。
+

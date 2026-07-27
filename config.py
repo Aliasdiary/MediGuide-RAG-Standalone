@@ -27,6 +27,11 @@ class MediGuideConfig:
     top_k: int = 4
     temperature: float = 0.1
     max_tokens: int = 2048
+    evidence_gate_min_score: int = 2
+    evidence_gate_max_docs: int = 3
+    reranker_model: str = "BAAI/bge-reranker-base"
+    use_cross_encoder_reranker: bool = False
+    rag_sft_model_path: str = str(PROJECT_ROOT / "finetune" / "export" / "qwen25-3b-mediguide-sft")
 
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "MediGuideConfig":
@@ -45,6 +50,11 @@ class MediGuideConfig:
             "top_k": self.top_k,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
+            "evidence_gate_min_score": self.evidence_gate_min_score,
+            "evidence_gate_max_docs": self.evidence_gate_max_docs,
+            "reranker_model": self.reranker_model,
+            "use_cross_encoder_reranker": self.use_cross_encoder_reranker,
+            "rag_sft_model_path": self.rag_sft_model_path,
         }
 
 
