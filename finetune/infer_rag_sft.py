@@ -70,12 +70,22 @@ def load_rag_components(config: MediGuideConfig) -> tuple[DataPreparationModule,
     data_module = DataPreparationModule(config.data_path)
     documents = data_module.load_documents()
     chunks = data_module.chunk_documents()
+    index_manifest = {
+        "dataset_fingerprint": data_module.dataset_fingerprint(),
+        "embedding_model": config.embedding_model,
+        "dataset_limit": config.dataset_limit,
+        "dataset_seed": config.dataset_seed,
+        "chunk_strategy": "question-child/full-qa-parent-v1",
+    }
     index_module = IndexConstructionModule(
-        embedding_model=config.embedding_model,
+        model_name=config.embedding_model,
         index_save_path=config.index_save_path,
-        dataset_fingerprint=data_module.dataset_fingerprint(),
+        expected_manifest=index_manifest,
     )
-    vectorstore = index_module.load_or_create_index(chunks)
+    vectorstore = index_module.load_index()
+    if vectorstore is None:
+        vectorstore = index_module.build_vector_index(chunks)
+        index_module.save_index()
     retrieval_module = RetrievalOptimizationModule(
         vectorstore,
         chunks,
@@ -232,4 +242,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
