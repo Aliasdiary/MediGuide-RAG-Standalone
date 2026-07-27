@@ -178,6 +178,41 @@ def mostly_english(text: str) -> bool:
     return ascii_letters > 40 and ascii_letters > chinese_chars
 
 
+def chinese_safety_fallback(question: str, evidence_status: str, evidence_text: str) -> str:
+    """Deterministic Chinese fallback when the SFT model keeps answering in English."""
+    text = f"{question}\n{evidence_text}".casefold()
+
+    if any(term in text for term in ("dog bite", "animal bite", "rabies", "被狗咬", "动物咬", "狂犬")):
+        return (
+            "被狗或其他动物咬伤后，应尽快用流动清水和肥皂充分冲洗伤口，并尽快到医疗机构评估伤口处理、"
+            "狂犬病暴露和破伤风风险。若伤口较深、出血明显、动物来源不明或无法确认免疫情况，不要等待观察，"
+            "应及时就医。"
+        )
+
+    if any(term in text for term in ("dose", "dosage", "double dose", "increase dose", "剂量", "加倍", "加量")):
+        return (
+            "不建议自行调整或加倍药物剂量。药物剂量需要结合病情、检查结果、肝肾功能、合并疾病和正在使用的其他药物综合判断，"
+            "应由医生或药师评估后决定。自行加量可能增加不良反应或治疗风险。"
+        )
+
+    if any(term in text for term in ("chest pain", "shortness of breath", "loss of consciousness", "胸痛", "呼吸困难", "意识")):
+        return (
+            "这个问题可能涉及需要及时处理的危险信号。若出现胸痛、呼吸困难、意识异常、严重出血或症状快速加重，"
+            "应立即联系急救服务或前往急诊。"
+        )
+
+    if evidence_status in {"insufficient", "subject_mismatch", "conflict"}:
+        return (
+            "当前检索到的资料不足以直接支持具体回答。建议补充症状、持续时间、用药或检查背景，并咨询专业医疗人员；"
+            "不要根据不充分信息自行诊断或调整治疗。"
+        )
+
+    return (
+        "根据当前检索到的资料，这个问题需要结合具体症状、病史和检查结果综合判断。建议将检索信息作为健康科普参考，"
+        "如涉及治疗选择、药物使用或症状加重，应咨询医生或药师。"
+    )
+
+
 def run_generation(model, tokenizer, device: str, prompt: str, generation_kwargs: dict) -> str:
     inputs = tokenizer(prompt, return_tensors="pt").to(device)
     with torch.no_grad():
@@ -219,6 +254,8 @@ def generate_answer(args, evidence_status: str, evidence_text: str) -> str:
     if args.force_chinese and mostly_english(answer):
         rewrite_prompt = build_chat_prompt(tokenizer, CHINESE_REWRITE_PROMPT, build_rewrite_prompt(args.question, answer))
         answer = normalize_answer(run_generation(model, tokenizer, device, rewrite_prompt, generation_kwargs))
+        if mostly_english(answer):
+            answer = chinese_safety_fallback(args.question, evidence_status, evidence_text)
     return answer
 
 
