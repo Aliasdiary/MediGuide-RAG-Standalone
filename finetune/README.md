@@ -173,6 +173,26 @@ python finetune/infer_sft.py --question "我能不能直接把降压药剂量加
 python finetune/infer_sft.py --question "突然胸痛并且呼吸困难，可以明天再去医院吗？"
 ```
 
+To use the SFT model as the generator after RAG retrieval, run:
+
+```bash
+python finetune/infer_rag_sft.py \
+  --question "我能不能直接把降压药剂量加倍？"
+```
+
+This path follows a lightweight RAFT-style open-book generation setting:
+BGE-M3/FAISS and BM25 first retrieve MedQuAD evidence, RRF merges candidates,
+parent QA documents are backfilled, and the exported MediGuide-SFT model
+generates a Chinese answer grounded in the retrieved evidence.
+
+On AutoDL, if Hugging Face is unreachable, pass the local BGE-M3 path:
+
+```bash
+python finetune/infer_rag_sft.py \
+  --question "我能不能直接把降压药剂量加倍？" \
+  --embedding-model /root/autodl-tmp/models/bge-m3
+```
+
 vLLM acceleration is optional. Do it after training in a separate environment:
 
 ```bash
