@@ -196,6 +196,27 @@ python finetune/infer_rag_sft.py \
   --embedding-model /root/autodl-tmp/models/bge-m3
 ```
 
+The RAG-SFT path uses beam sampling by default instead of greedy decoding:
+
+```text
+num_beams = 3
+do_sample = true
+temperature = 0.3
+top_p = 0.9
+repetition_penalty = 1.05
+```
+
+You can adjust these during debugging:
+
+```bash
+python finetune/infer_rag_sft.py \
+  --question "我被狗咬了" \
+  --embedding-model /root/autodl-tmp/models/bge-m3 \
+  --num-beams 3 \
+  --temperature 0.3 \
+  --top-p 0.9
+```
+
 vLLM acceleration is optional. Do it after training in a separate environment:
 
 ```bash

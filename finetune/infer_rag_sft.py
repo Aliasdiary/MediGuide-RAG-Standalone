@@ -338,6 +338,9 @@ def main() -> None:
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--max-context-chars", type=int, default=2200)
     parser.add_argument("--max-new-tokens", type=int, default=256)
+    parser.add_argument("--num-beams", type=int, default=3)
+    parser.add_argument("--temperature", type=float, default=0.3)
+    parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -364,8 +367,8 @@ def main() -> None:
         torch_dtype=torch.bfloat16 if args.device == "cuda" else torch.float32,
         trust_remote_code=True,
     ).to(args.device)
-    model.generation_config.temperature = None
-    model.generation_config.top_p = None
+    model.generation_config.temperature = args.temperature
+    model.generation_config.top_p = args.top_p
     model.generation_config.top_k = None
     model.eval()
 
@@ -376,7 +379,10 @@ def main() -> None:
         outputs = model.generate(
             **inputs,
             max_new_tokens=args.max_new_tokens,
-            do_sample=False,
+            do_sample=True,
+            num_beams=args.num_beams,
+            temperature=args.temperature,
+            top_p=args.top_p,
             repetition_penalty=1.05,
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
