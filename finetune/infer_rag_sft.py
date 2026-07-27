@@ -169,7 +169,34 @@ def normalize_answer(answer: str) -> str:
     answer = re.sub(r"(?i)this answer is for health education only.*", "", answer).strip()
     answer = re.sub(r"本回答(仅|只)?用于健康科普.*?(。|$)", "", answer).strip()
     answer = re.sub(r"(不能替代医生诊断或治疗建议。)(\s*\1)+", r"\1", answer)
+    answer = strip_evidence_leakage(answer)
     return answer.strip()
+
+
+def strip_evidence_leakage(answer: str) -> str:
+    """Remove leaked prompt/evidence blocks from the final user-facing answer."""
+    leakage_patterns = [
+        r"\n\s*证据状态\s*[:：]",
+        r"\n\s*证据\s*\d+\s*[:：]",
+        r"\n\s*\[证据\s*\d+\]",
+        r"\n\s*RAG\s*检索证据\s*[:：]",
+        r"\n\s*Evidence status\s*[:：]",
+        r"\n\s*Evidence\s*\d+\s*[:：]",
+    ]
+    cleaned = answer
+    for pattern in leakage_patterns:
+        match = re.search(pattern, cleaned, flags=re.IGNORECASE)
+        if match:
+            cleaned = cleaned[: match.start()].strip()
+            break
+
+    lines = []
+    for line in cleaned.splitlines():
+        stripped = line.strip()
+        if re.match(r"^(证据状态|证据\s*\d+|RAG\s*检索证据|Evidence status|Evidence\s*\d+)\s*[:：]", stripped, re.IGNORECASE):
+            break
+        lines.append(line)
+    return "\n".join(lines).strip()
 
 
 def mostly_english(text: str) -> bool:
