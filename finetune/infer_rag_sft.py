@@ -101,7 +101,7 @@ def retrieve_parent_docs(
     return parent_docs[:top_k]
 
 
-def compact_medquad_content(content: str, answer_chars: int = 900) -> str:
+def compact_medquad_content(content: str, answer_chars: int = 450) -> str:
     if "## Answer" not in content:
         return re.sub(r"\s+", " ", content).strip()[:answer_chars]
 
@@ -109,7 +109,7 @@ def compact_medquad_content(content: str, answer_chars: int = 900) -> str:
     question_part = question_part.replace("#", "").replace("Question", "").strip()
     answer_part = re.sub(r"\s+", " ", answer_part).strip()
     excerpt = answer_part[:answer_chars].rsplit(" ", 1)[0].strip()
-    return f"Evidence question: {question_part}\nEvidence answer excerpt: {excerpt}"
+    return f"Evidence question: {question_part}\nRelevant evidence excerpt: {excerpt}"
 
 
 def format_evidence(docs: List[Document], max_chars: int) -> str:
@@ -143,30 +143,31 @@ def format_evidence(docs: List[Document], max_chars: int) -> str:
 
 
 def build_grounded_user_prompt(question: str, evidence: str) -> str:
-    return f"""你将获得一个用户医疗健康问题和若干条 MedQuAD 检索证据。
-
-请按以下通用标准回答，不要输出思考过程：
-1. 先判断用户真正的问题，并在第一句话直接回答。
-2. 只使用与问题直接相关的证据；如果证据里有无关资料或长列表，只提取必要信息，不要照搬原文。
-3. 如果证据不足以支持结论，明确说明当前检索证据不足，不要用模型常识补充医学结论。
-4. 涉及诊断、处方、药物剂量或治疗方案时，只能提供健康科普和就医建议，不能给个体化诊断、处方或剂量。
-5. 涉及急性危险信号时，应建议及时就医或急诊，但不能做确定诊断。
-6. 使用简体中文，输出 3 到 5 句自然段；不要使用“结论/原因/建议”固定标题，不要重复句子。
-7. 如引用证据，可用 [资料1]、[资料2] 这种形式简要标注。
+    return f"""你是医疗健康科普助手。下面的 MedQuAD 检索结果只是“参考证据”，不是要你翻译或复述的答案。
 
 用户问题：
 {question}
 
-MedQuAD 检索证据：
+参考证据：
 {evidence}
 
-请直接输出最终中文回答："""
+请严格按下面要求回答：
+1. 必须围绕“用户问题”回答，第一句话直接给出可执行的科普性结论。
+2. 参考证据只用于辅助判断和解释原因，不要逐句翻译英文证据，不要复述机构介绍、来源名称或无关长列表。
+3. 如果证据与问题不完全匹配，只能说明证据不足或给出通用就医建议，不要编造诊断、处方、剂量或疗效。
+4. 涉及用药和剂量时，不能建议用户自行加量、停药或换药，应提示咨询医生或药师。
+5. 涉及可能紧急的症状或暴露风险时，应提示及时就医或急诊处理，但不要做确定诊断。
+6. 只输出简体中文自然段，控制在 3 到 5 句；不要输出英文，不要使用“结论/原因/建议”标题，不要重复免责声明。
+
+最终回答："""
 
 
 def normalize_answer(text: str) -> str:
     text = re.sub(r"<think>.*?</think>", "", text or "", flags=re.DOTALL).strip()
     text = re.sub(r"(?i)final answer(?: in chinese)?:", "", text).strip()
     text = re.sub(r"(?i)this answer is for health education only[^.\n]*\.", "", text).strip()
+    text = re.sub(r"本回答由.*?生成，?", "", text).strip()
+    text = re.sub(r"Centers for Disease Control and Prevention,? Atlanta,? GA\.?", "", text).strip()
     text = text.translate(
         str.maketrans(
             {
@@ -186,6 +187,7 @@ def normalize_answer(text: str) -> str:
     text = dedupe_sentences(text)
     text = re.sub(r"\n{3,}", "\n\n", text).strip()
     text = text.replace(FINAL_DISCLAIMER, "").strip()
+    text = re.sub(r"(本回答仅用于健康科普[，,].*?建议。?)+", "", text).strip()
     if "不能替代医生" not in text:
         text = f"{text}\n\n{FINAL_DISCLAIMER}".strip()
     return text
@@ -225,9 +227,9 @@ def main() -> None:
     parser.add_argument("--retrieval-query", default=None)
     parser.add_argument("--embedding-model", default=None)
     parser.add_argument("--index-save-path", default=None)
-    parser.add_argument("--top-k", type=int, default=4)
-    parser.add_argument("--max-context-chars", type=int, default=4500)
-    parser.add_argument("--max-new-tokens", type=int, default=384)
+    parser.add_argument("--top-k", type=int, default=3)
+    parser.add_argument("--max-context-chars", type=int, default=2200)
+    parser.add_argument("--max-new-tokens", type=int, default=256)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
 
@@ -266,7 +268,8 @@ def main() -> None:
             **inputs,
             max_new_tokens=args.max_new_tokens,
             do_sample=False,
-            repetition_penalty=1.08,
+            repetition_penalty=1.15,
+            no_repeat_ngram_size=8,
             eos_token_id=tokenizer.eos_token_id,
         )
 
