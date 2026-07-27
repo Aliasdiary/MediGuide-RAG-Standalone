@@ -184,6 +184,9 @@ This path follows a lightweight RAFT-style open-book generation setting:
 BGE-M3/FAISS and BM25 first retrieve MedQuAD evidence, RRF merges candidates,
 parent QA documents are backfilled, and the exported MediGuide-SFT model
 generates a Chinese answer grounded in the retrieved evidence.
+The retrieved organization, URL, and question-type metadata are kept for
+debugging, but are not passed into the generator or displayed in the final
+answer.
 
 On AutoDL, if Hugging Face is unreachable, pass the local BGE-M3 path:
 
