@@ -196,17 +196,19 @@ python finetune/infer_rag_sft.py \
   --embedding-model /root/autodl-tmp/models/bge-m3
 ```
 
-The RAG-SFT path uses beam sampling by default instead of greedy decoding:
+The RAG-SFT path uses deterministic decoding by default while debugging
+retrieval grounding:
 
 ```text
-num_beams = 3
-do_sample = true
-temperature = 0.3
+num_beams = 1
+do_sample = false
+temperature = 0.0
 top_p = 0.9
 repetition_penalty = 1.05
+max_new_tokens = 128
 ```
 
-You can adjust these during debugging:
+After retrieval and evidence gating are stable, you can test sampling manually:
 
 ```bash
 python finetune/infer_rag_sft.py \
@@ -215,6 +217,13 @@ python finetune/infer_rag_sft.py \
   --num-beams 3 \
   --temperature 0.3 \
   --top-p 0.9
+```
+
+To scan SFT targets and evidence files for disclaimer, copyright, or template
+contamination, run:
+
+```bash
+python finetune/scan_text_contamination.py finetune data
 ```
 
 vLLM acceleration is optional. Do it after training in a separate environment:

@@ -130,16 +130,52 @@ def retrieve_parent_docs(
     return parent_docs[:top_k]
 
 
+def is_subject_mismatch(question_type: str, doc: Document) -> bool:
+    if question_type != "human_animal_bite":
+        return False
+
+    text = f"{doc.metadata.get('focus', '')} {doc.metadata.get('question_type', '')} {doc.page_content}".casefold()
+    animal_management_terms = [
+        "euthan",
+        "quarantine",
+        "isolate the animal",
+        "confine",
+        "owner",
+        "release after",
+        "livestock",
+    ]
+    human_care_terms = [
+        "person",
+        "people",
+        "human",
+        "patient",
+        "you",
+        "wound",
+        "wash",
+        "medical care",
+        "post-exposure",
+        "exposed",
+        "shots",
+        "treatment",
+    ]
+    return any(term in text for term in animal_management_terms) and not any(
+        term in text for term in human_care_terms
+    )
+
+
 def rerank_parent_docs(question: str, docs: List[Document], top_k: int) -> List[Document]:
     question_type = classify_question(question)
     scored = []
     for doc in docs:
+        if is_subject_mismatch(question_type, doc):
+            doc.metadata["support_score"] = "subject_mismatch"
+            continue
         score = evidence_support_score(question_type, doc)
         if score > 0:
             doc.metadata["support_score"] = score
             scored.append((score, doc))
     if not scored:
-        return docs[:top_k]
+        return []
     scored.sort(key=lambda item: item[0], reverse=True)
     return [doc for _, doc in scored[:top_k]]
 
@@ -216,7 +252,7 @@ def compact_medquad_content(content: str, answer_chars: int = 420) -> str:
 
 def format_evidence(docs: List[Document], max_chars: int) -> str:
     if not docs:
-        return "No relevant MedQuAD evidence was retrieved."
+        return "当前未检索到能够直接回答该问题的医学证据。"
 
     parts = []
     seen = set()
@@ -337,9 +373,9 @@ def main() -> None:
     parser.add_argument("--index-save-path", default=None)
     parser.add_argument("--top-k", type=int, default=3)
     parser.add_argument("--max-context-chars", type=int, default=2200)
-    parser.add_argument("--max-new-tokens", type=int, default=256)
-    parser.add_argument("--num-beams", type=int, default=3)
-    parser.add_argument("--temperature", type=float, default=0.3)
+    parser.add_argument("--max-new-tokens", type=int, default=128)
+    parser.add_argument("--num-beams", type=int, default=1)
+    parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     args = parser.parse_args()
@@ -367,8 +403,8 @@ def main() -> None:
         torch_dtype=torch.bfloat16 if args.device == "cuda" else torch.float32,
         trust_remote_code=True,
     ).to(args.device)
-    model.generation_config.temperature = args.temperature
-    model.generation_config.top_p = args.top_p
+    model.generation_config.temperature = None if args.temperature <= 0 else args.temperature
+    model.generation_config.top_p = None if args.temperature <= 0 else args.top_p
     model.generation_config.top_k = None
     model.eval()
 
@@ -379,10 +415,10 @@ def main() -> None:
         outputs = model.generate(
             **inputs,
             max_new_tokens=args.max_new_tokens,
-            do_sample=True,
+            do_sample=args.temperature > 0,
             num_beams=args.num_beams,
-            temperature=args.temperature,
-            top_p=args.top_p,
+            temperature=args.temperature if args.temperature > 0 else None,
+            top_p=args.top_p if args.temperature > 0 else None,
             repetition_penalty=1.05,
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.pad_token_id or tokenizer.eos_token_id,
