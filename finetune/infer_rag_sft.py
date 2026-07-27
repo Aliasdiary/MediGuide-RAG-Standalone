@@ -47,12 +47,20 @@ MEDICAL_QUERY_EXPANSIONS = {
 
 SYSTEM_PROMPT = """你是医疗健康科普问答 Agent 的生成模块。
 你的输入包含用户问题、RAG 检索证据和证据状态。请遵守：
+0. 最终回答必须使用简体中文；英文证据只能作为参考，不能直接输出英文原文。
 1. 先回答用户真正问的问题，不要机械翻译或整段复述证据。
 2. 只使用与用户主体、疾病/药物/检查项目、问题类型一致的证据。
 3. 如果证据不足、主体错配或证据冲突，要明确说明当前证据不足以支持具体回答，并只给通用安全建议。
 4. 不做疾病诊断，不提供处方，不给个体化剂量，不要求用户自行调整药物。
 5. 对可能需要及时处理的问题，优先给出就医或咨询专业人员的行动建议。
 6. 用简洁中文自然段回答，避免重复免责声明、来源版权声明、英文标签和无关机构信息。"""
+
+CHINESE_REWRITE_PROMPT = """你是医疗健康科普问答 Agent 的中文改写模块。
+请把候选回答改写为简体中文自然段，并遵守：
+1. 只保留与用户问题直接相关的医学科普信息。
+2. 不新增诊断、处方或个体化剂量建议。
+3. 不输出英文原文、来源版权声明、机构宣传语或重复免责声明。
+4. 如果候选回答没有回答用户问题，请基于其有效信息给出简短中文安全回答。"""
 
 
 def rewrite_retrieval_query(question: str) -> str:
@@ -130,6 +138,16 @@ RAG 检索证据：
 请基于上述证据状态和可用证据，用中文回答用户问题。"""
 
 
+def build_rewrite_prompt(question: str, draft_answer: str) -> str:
+    return f"""用户问题：
+{question}
+
+候选回答：
+{draft_answer}
+
+请输出最终简体中文回答。"""
+
+
 def build_chat_prompt(tokenizer, system_prompt: str, user_prompt: str) -> str:
     messages = [
         {"role": "system", "content": system_prompt},
@@ -154,6 +172,19 @@ def normalize_answer(answer: str) -> str:
     return answer.strip()
 
 
+def mostly_english(text: str) -> bool:
+    ascii_letters = len(re.findall(r"[A-Za-z]", text))
+    chinese_chars = len(re.findall(r"[\u4e00-\u9fff]", text))
+    return ascii_letters > 40 and ascii_letters > chinese_chars
+
+
+def run_generation(model, tokenizer, device: str, prompt: str, generation_kwargs: dict) -> str:
+    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    with torch.no_grad():
+        outputs = model.generate(**inputs, **generation_kwargs)
+    return tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
+
+
 def generate_answer(args, evidence_status: str, evidence_text: str) -> str:
     device = "cuda" if torch.cuda.is_available() else "cpu"
     tokenizer = AutoTokenizer.from_pretrained(args.model_path, trust_remote_code=True)
@@ -165,7 +196,6 @@ def generate_answer(args, evidence_status: str, evidence_text: str) -> str:
     model.eval()
 
     prompt = build_chat_prompt(tokenizer, SYSTEM_PROMPT, build_user_prompt(args.question, evidence_status, evidence_text))
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
 
     generation_kwargs = {
         "max_new_tokens": args.max_new_tokens,
@@ -185,10 +215,11 @@ def generate_answer(args, evidence_status: str, evidence_text: str) -> str:
     else:
         generation_kwargs.update({"do_sample": False, "num_beams": 1})
 
-    with torch.no_grad():
-        outputs = model.generate(**inputs, **generation_kwargs)
-    answer = tokenizer.decode(outputs[0][inputs.input_ids.shape[1] :], skip_special_tokens=True)
-    return normalize_answer(answer)
+    answer = normalize_answer(run_generation(model, tokenizer, device, prompt, generation_kwargs))
+    if args.force_chinese and mostly_english(answer):
+        rewrite_prompt = build_chat_prompt(tokenizer, CHINESE_REWRITE_PROMPT, build_rewrite_prompt(args.question, answer))
+        answer = normalize_answer(run_generation(model, tokenizer, device, rewrite_prompt, generation_kwargs))
+    return answer
 
 
 def main() -> None:
@@ -205,6 +236,8 @@ def main() -> None:
     parser.add_argument("--top-p", type=float, default=0.9)
     parser.add_argument("--num-beams", type=int, default=1)
     parser.add_argument("--use-reranker", action="store_true")
+    parser.add_argument("--no-force-chinese", dest="force_chinese", action="store_false")
+    parser.set_defaults(force_chinese=True)
     args = parser.parse_args()
 
     rag_config = MediGuideConfig.from_dict(DEFAULT_CONFIG.to_dict())
