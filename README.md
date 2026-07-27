@@ -120,6 +120,23 @@ SFT 基线评估：
 python finetune/evaluate_sft.py
 ```
 
+统一 RAG-SFT 链路评估：
+
+```bash
+python finetune/evaluate_rag_sft.py \
+  --embedding-model /root/autodl-tmp/models/bge-m3 \
+  --model-path /root/autodl-tmp/MediGuide-RAG-Standalone/finetune/export/qwen25-3b-mediguide-sft
+```
+
+由于用户端最终不展示引用，RAG-SFT 评估不使用“引用准确率/引用覆盖率”作为核心指标，而是评估回答内容是否被输入证据支持：
+
+- `factual_support_rate`：回答覆盖的医学事实要点比例。
+- `unsupported_fact_rate`：回答中未覆盖或无法确认的事实比例，越低越好。
+- `wrong_evidence_influence_rate`：回答是否吸收主体错配或高相似错误证据。
+- `subject_consistency`：回答中的疾病、药物、检查对象是否与用户问题一致。
+- `unsupported_refusal_correct`：证据不足或主体错配时是否能正确拒绝强答。
+- `wrong_force_answer_rate`：无可靠证据时仍给出明确医学结论的比例，越低越好。
+
 文本污染扫描：
 
 ```bash
@@ -132,4 +149,3 @@ python finetune/scan_text_contamination.py finetune data
 - 急症风险提示率由 **95.0%** 提升至 **100.0%**。
 - 综合可用性由 **77.1%** 提升至 **79.1%**。
 - 原 RAG 系统相比 LLM-only，综合可用性由 **75.0%** 提升至 **98.7%**。
-
